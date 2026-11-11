@@ -23,12 +23,13 @@ try{
  await page.getByRole('button',{name:'RESUME',exact:true}).click();await page.keyboard.down('ArrowRight');await page.waitForTimeout(250);await page.keyboard.up('ArrowRight');assert.ok((await page.evaluate(()=>fixture.state())).x>before.x);
  if(label!=='desktop'){
  await page.getByRole('button',{name:'RESTART',exact:true}).click();
- const gesture=async(dx,dy,type='pointerup')=>page.locator('#game').evaluate((canvas,[dx,dy,type])=>{
+ assert.equal(await page.locator('#mobileDpad button').count(),0);assert.equal(await page.locator('#movementGuide').isVisible(),true);
+ const gesture=async(dx,dy,type='pointerup')=>page.locator('#movementGuide').evaluate((canvas,[dx,dy,type])=>{
   canvas.dispatchEvent(new PointerEvent('pointerdown',{pointerId:71,pointerType:'touch',clientX:100,clientY:100,bubbles:true}));
   canvas.dispatchEvent(new PointerEvent(type,{pointerId:71,pointerType:'touch',clientX:100+dx,clientY:100+dy,bubbles:true}));
  },[dx,dy,type]);
  // Synthetic fixture pointers do not own native pointer capture.
- await page.evaluate(()=>{document.querySelector('#game').setPointerCapture=()=>{}});
+ await page.evaluate(()=>{document.querySelector('#movementGuide').setPointerCapture=()=>{}});
  await gesture(55,0);await page.waitForTimeout(240);
  assert.ok((await page.evaluate(()=>fixture.state())).x>1);
  await gesture(0,0);const stopped=await page.evaluate(()=>fixture.state());
