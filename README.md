@@ -13,3 +13,13 @@ Source comparisons: legacy Sentence-Eater/main/index.html blob 8ced6abb0e59ede6a
 Temporary isolation boundary: built-in Spanish fixture and device speech remain solely for this preview. Shared set adapter, central pronunciation and same-set return are the next integration gate. Do not treat the sample menu or local speech as a production shared-interface implementation. No production cutover authorized.
 
 CI injects deterministic collision hooks only into its HTTP fixture; they are absent from dist-preview. Tests cover desktop, portrait and landscape sizing, keyboard motion, pause, restart, wrong/correct collection, pellets, sentence audio order, maze transition, sound and menu exit with external requests denied. Physical-device audio and user gameplay acceptance remain separate.
+
+## Shared staging integration — 11 November 2026
+
+This section supersedes the earlier temporary-isolation status. The approved solid walls, two midline passages, safe ghost respawn, ghost separation, readable labels, and mobile slide/tap guide are retained.
+
+The engine accepts validated English/target pairs and the explicit locale from the staging shell through bt-sentence-eater/1. It sends pronunciation, cancellation, sound and menu events to the shared service. It makes no catalog, sharing or database requests. The standalone fixed sample remains a labeled isolated review fixture, not a public launcher.
+
+Pinned integrated artifact: https://d03f8878.bt-sentence-eater-preview.pages.dev/ ; build ID e6c00888c6ed61dddc85e293ad6e0e3b68f2ce101a2c7e8fddf934c49d17ef43. Shared shell commit 84702e33fd71b71552a6932e8e45f31a8d8da702 ; deployed review https://4083277b.bt-vocabulary-platform-staging.pages.dev/ . Previous shell/lock and standalone artifacts remain available for rollback. Production routing is unchanged.
+
+Automated engine run 42997456860 passed: desktop/portrait/landscape regression plus exact iframe handshake, custom content, word/full-sentence speech messages and menu event across ES/DE/DA/FR/IT with network intercepted. Central contract run 42997829317 passed. Browser verified built-in Present tense selection (9 pairs), custom 2-pair sharing to isolated staging, fresh student launch, correct English prompt and return to the same SUKVLZ4TF snapshot. Physical-device audible shared pronunciation remains a separate user check. This is staging evidence, not production acceptance or public release.
