@@ -35,7 +35,7 @@ if(!portraitMaze){maze[9][9]=' ';maze[9][23]=' '}
 dots.clear();pellets.clear();for(let y=0;y<R;y++)for(let x=0;x<C;x++){if(maze[y][x]==='.'||maze[y][x]==='o'){(maze[y][x]==='o'?pellets:dots).add(key(x,y));maze[y][x]=' '}}wallArt=null;}
 function validBase(x,y){return portraitMaze?(x>0&&x<C-1&&y>0&&y<R-1):(base[y]&&base[y][x]&&base[y][x]!=='#')}
 function freeTiles(){let a=[];for(let y=1;y<R-1;y++)for(let x=1;x<C-1;x++)if(valid(x,y))a.push({x,y});return a}
-function spawn(){let tiles=freeTiles();player={x:1,y:1,dir:{x:1,y:0},want:{x:1,y:0}};if(!valid(player.x,player.y))player={...tiles[0],dir:dirs[0],want:dirs[0]};ghosts=[];for(let i=0;i<5;i++){let t=pick(tiles.filter(p=>Math.abs(p.x-player.x)+Math.abs(p.y-player.y)>12&&!ghosts.some(g=>g.x===p.x&&g.y===p.y)));ghosts.push({...t,dir:pick(dirs),label:'',correct:false,chase:i%2===1,color:['#ff7e91','#6fe3ca','#c8a4ff','#ffb45d','#71b8ff'][i]})}labels()}
+function spawn(){let tiles=freeTiles();player={x:1,y:1,dir:{x:1,y:0},want:{x:1,y:0}};if(!valid(player.x,player.y))player={...tiles[0],dir:dirs[0],want:dirs[0]};ghosts=[];for(let i=0;i<5;i++){let candidates=tiles.filter(p=>Math.abs(p.x-player.x)+Math.abs(p.y-player.y)>12&&!ghosts.some(g=>ghostDistance(p,g)<4));if(!candidates.length)candidates=tiles.filter(p=>ghostDistance(p,player)>6&&!ghosts.some(g=>g.x===p.x&&g.y===p.y));let t=pick(candidates);ghosts.push({...t,dir:pick(dirs),label:'',correct:false,chase:i%2===1,color:['#ff7e91','#6fe3ca','#c8a4ff','#ffb45d','#71b8ff'][i]})}labels()}
 function labels(){let target=words()[word],distractors=[...new Set([...(Object.values(LIB[currentLanguage]||{}).flat().flatMap(pair=>pair[1].split(/\s+/))),...sentences.flatMap(pair=>pair[1].split(/\s+/))])].filter(Boolean);let current=words();let pool=[...new Set([...current.filter((w,i)=>i!==word),...distractors])].filter(w=>w.toLocaleLowerCase()!==target.toLocaleLowerCase());ghosts.forEach((g,i)=>{g.correct=i===0;g.label=g.correct?target:pool.splice(Math.random()*pool.length|0,1)[0]||'otra'});ghosts.sort(()=>Math.random()-.5);renderHud()}
 function renderHud(){$('score').textContent='SCORE '+String(score).padStart(4,'0');$('lives').textContent='♥ '.repeat(lives).trim();$('prompt').textContent=sentences[sentence%sentences.length][0];$('progress').textContent='MAZE '+mazeNum+' · SENTENCE '+(sentence+1);$('slots').replaceChildren(...words().map((w,i)=>{let d=document.createElement('span');d.className='slot'+(i<word?' done':'');d.textContent=i<word?w:'?';return d}))}
 function say(t,after){if(!sound||!('speechSynthesis'in window))return;try{speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(t);u.lang=currentLanguage;u.rate=.9;if(after)u.onend=()=>{if(sound){let full=new SpeechSynthesisUtterance(after);full.lang=currentLanguage;full.rate=.9;speechSynthesis.speak(full)}};speechSynthesis.speak(u)}catch(e){}}
@@ -84,7 +84,7 @@ function playerDistances(){
 function restoreGhost(){
  if(!respawnGhost)return;
  const distances=playerDistances();
- const tiles=freeTiles().filter(t=>(distances.get(key(t.x,t.y))??-1)>=7&&!ghosts.some(h=>h.x===t.x&&h.y===t.y));
+ const tiles=freeTiles().filter(t=>(distances.get(key(t.x,t.y))??-1)>=7&&!ghosts.some(h=>ghostDistance(t,h)<4));
  // Keep the ghost pending rather than forcing an unsafe spawn.
  if(!tiles.length)return;
  const g=respawnGhost,t=pick(tiles);respawnGhost=null;g.x=t.x;g.y=t.y;
@@ -96,7 +96,25 @@ function adj(p){return dirs.filter(d=>{let n=wrapPosition(p.x+d.x,p.y+d.y);retur
 function activeDirection(){for(let i=heldDirections.length-1;i>=0;i--){let d=heldDirections[i];if(keys[d])return keyDirections[d]}return null}
 
 function stepPlayer(){if(transition>0)return;let d=activeDirection();if(!d)return;let options=adj(player);if(!options.some(v=>v.x===d.x&&v.y===d.y))return;let n=wrapPosition(player.x+d.x,player.y+d.y);player.x=n.x;player.y=n.y;player.dir=d;touch()}
-function stepGhost(g){let opts=adj(g);if(!opts.length)return;let back=opts.filter(d=>d.x!==-g.dir.x||d.y!==-g.dir.y);if(back.length)opts=back;let choice;if(g.chase&&Math.random()<.48){let best=Math.min(...opts.map(d=>Math.abs(g.x+d.x-player.x)+Math.abs(g.y+d.y-player.y)));choice=pick(opts.filter(d=>Math.abs(g.x+d.x-player.x)+Math.abs(g.y+d.y-player.y)===best))}else choice=opts.find(d=>d.x===g.dir.x&&d.y===g.dir.y&&Math.random()<.55)||pick(opts);let n=wrapPosition(g.x+choice.x,g.y+choice.y);g.x=n.x;g.y=n.y;g.dir=choice}
+function ghostDistance(a,b){
+ const dx=Math.abs(a.x-b.x),dy=Math.abs(a.y-b.y);
+ return a.y===Math.floor(R/2)&&b.y===a.y?Math.min(dx,C-dx):dx+dy;
+}
+function stepGhost(g){
+ const others=ghosts.filter(h=>h!==g);
+ let opts=adj(g).filter(d=>{const n=wrapPosition(g.x+d.x,g.y+d.y);return !others.some(h=>h.x===n.x&&h.y===n.y)});
+ if(!opts.length)return;
+ const separation=d=>{const n=wrapPosition(g.x+d.x,g.y+d.y);return Math.min(...others.map(h=>ghostDistance(n,h)),9)};
+ const current=Math.min(...others.map(h=>ghostDistance(g,h)),9);
+ const roomy=opts.filter(d=>separation(d)>=4);
+ if(roomy.length)opts=roomy;
+ else {const best=Math.max(...opts.map(separation));if(current>=4||best<current)return;opts=opts.filter(d=>separation(d)===best)}
+ const forward=opts.filter(d=>d.x!==-g.dir.x||d.y!==-g.dir.y);if(forward.length)opts=forward;
+ let choice;
+ if(g.chase&&Math.random()<.48){const best=Math.min(...opts.map(d=>Math.abs(g.x+d.x-player.x)+Math.abs(g.y+d.y-player.y)));choice=pick(opts.filter(d=>Math.abs(g.x+d.x-player.x)+Math.abs(g.y+d.y-player.y)===best))}
+ else choice=opts.find(d=>d.x===g.dir.x&&d.y===g.dir.y&&Math.random()<.55)||pick(opts);
+ const n=wrapPosition(g.x+choice.x,g.y+choice.y);g.x=n.x;g.y=n.y;g.dir=choice;
+}
 // Render only exposed maze boundaries: the collision grid is unchanged.
 // Connected outlines are cached per maze, so the walls do not flicker or shift.
 const chamberX=portraitMaze?3:11,chamberY=portraitMaze?10:7,chamberW=portraitMaze?9:11;let wallArt=null;
@@ -106,25 +124,32 @@ function buildWallArt(){
  for(let y=0;y<R;y++)for(let x=0;x<C;x++)if(maze[y][x]==='#')g.fillRect(x*S,y*S,S,S);
  return art;
 }
-function draw(){ctx.fillStyle='#050b1b';ctx.fillRect(0,0,cv.width,cv.height);if(!wallArt)wallArt=buildWallArt();ctx.drawImage(wallArt,0,0);for(let k of dots){let [x,y]=k.split(',').map(Number);ctx.fillStyle='#9aafc9';ctx.fillRect(x*S+15,y*S+15,3,3)}for(let k of pellets){let [x,y]=k.split(',').map(Number);ctx.fillStyle='#ffe26e';ctx.beginPath();ctx.arc(x*S+16,y*S+16,6,0,7);ctx.fill()}for(let g of ghosts){let x=g.x*S+16,y=g.y*S+16;ctx.save();ctx.globalAlpha=collectionFreeze>0?.3:(freeze>0?.6:1);ctx.fillStyle=g.color;ctx.beginPath();ctx.arc(x,y-4,15,Math.PI,0);ctx.lineTo(x+15,y+12);for(let i=0;i<4;i++)ctx.lineTo(x+15-i*10,y+8+(i%2)*6);ctx.closePath();ctx.fill();ctx.fillStyle='#fff';ctx.fillRect(x-9,y-7,7,8);ctx.fillRect(x+4,y-7,7,8);ctx.fillStyle='#11223c';ctx.fillRect(x-6,y-4,3,4);ctx.fillRect(x+6,y-4,3,4);ctx.restore();ctx.save();ctx.globalAlpha=collectionFreeze>0?.3:1;ctx.font='bold 20px Courier New';let w=Math.max(110,Math.min(205,ctx.measureText(g.label).width+28)),lx=Math.max(4,Math.min(cv.width-w-4,x-w/2)),ly=0;
-// Prefer a word tag ABOVE its ghost. Keep the central sentence chamber clear.
-// The label is a visual overlay; it never changes the maze collision grid.
-const chamber={left:chamberX*S-7,right:(chamberX+chamberW)*S+7,top:chamberY*S-7,bottom:(chamberY+5)*S+7};
-const candidates=[
- {x:lx,y:y-60}, // directly above the ghost
- {x:Math.max(4,Math.min(cv.width-w-4,x+24)),y:y-55},
- {x:Math.max(4,Math.min(cv.width-w-4,x-w-24)),y:y-55},
- {x:Math.max(4,Math.min(cv.width-w-4,x-w/2)),y:y+21}
-];
-function overlap(a){return Math.max(0,Math.min(a.x+w+4,chamber.right)-Math.max(a.x-4,chamber.left))*Math.max(0,Math.min(a.y+38,chamber.bottom)-Math.max(a.y-4,chamber.top))}
-let best=null,bestScore=Infinity;
-for(let i=0;i<candidates.length;i++){
- const a=candidates[i],clampedY=Math.max(4,Math.min(cv.height-40,a.y));
- const outside=Math.abs(clampedY-a.y)*150;
- const score=overlap({x:a.x,y:clampedY})*100+outside+i*25;
- if(score<bestScore){bestScore=score;best={x:a.x,y:clampedY}}
+let ghostLabelCache=null;
+function ghostLabels(){
+ const signature=ghosts.map(g=>[g.x,g.y,g.label].join(':')).join('|')+'|'+player.x+':'+player.y;
+ if(ghostLabelCache?.signature===signature)return ghostLabelCache.boxes;
+ const boxes=new Map(),placed=[];
+ const chamber={x:chamberX*S-8,y:chamberY*S-8,w:chamberW*S+16,h:5*S+16};
+ const sprites=[...ghosts,player].map(g=>({x:g.x*S-3,y:g.y*S-5,w:38,h:42}));
+ const overlaps=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+ ctx.save();ctx.font='bold 20px Courier New';
+ for(const ghost of ghosts){
+  const x=ghost.x*S+16,y=ghost.y*S+16,w=Math.max(110,Math.min(205,ctx.measureText(ghost.label).width+28));
+  let best=null,bestScore=Infinity;
+  const tryBox=(left,top)=>{
+   const b={x:Math.max(5,Math.min(cv.width-w-5,left)),y:Math.max(5,Math.min(cv.height-39,top)),w:w+6,h:38};
+   if([chamber,...placed,...sprites].some(r=>overlaps(b,r)))return;
+   const distance=Math.hypot(b.x+w/2-x,b.y+19-y);
+   const score=distance+(b.y>y?12:0);
+   if(score<bestScore){best=b;bestScore=score}
+  };
+  for(const dy of [-62,24,-104,66,-146,108])for(const dx of [0,-w/2-25,w/2+25])tryBox(x-w/2+dx,y+dy);
+  if(!best)for(let top=5;top<cv.height-38;top+=20)for(let left=5;left<cv.width-w-5;left+=24)tryBox(left,top);
+  if(best){placed.push(best);boxes.set(ghost,{x:best.x+3,y:best.y+3,w})}
+ }
+ ctx.restore();ghostLabelCache={signature,boxes};return boxes;
 }
-lx=best.x;ly=best.y;ctx.fillStyle='#101b30';ctx.fillRect(lx-3,ly-3,w+6,38);ctx.fillStyle='#263a55';ctx.fillRect(lx,ly,w,32);ctx.strokeStyle=g.color;ctx.lineWidth=2.5;ctx.strokeRect(lx+1,ly+1,w-2,30);ctx.fillStyle='#f5f8ff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(g.label,lx+w/2,ly+16,w-12);ctx.restore()}if(player){let x=player.x*S+16,y=player.y*S+16;ctx.save();if(invuln>0&&Math.floor(invuln*9)%2===0)ctx.globalAlpha=.3;let ang=player.dir.x===1?0:player.dir.x===-1?Math.PI:player.dir.y===-1?-Math.PI/2:Math.PI/2;ctx.fillStyle='#ffe24c';ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,15,ang+.38,ang+Math.PI*2-.38);ctx.closePath();ctx.fill();ctx.restore()}// Sentence chamber: drawn exactly over the solid island, never a walkable tile.
+function draw(){ctx.fillStyle='#050b1b';ctx.fillRect(0,0,cv.width,cv.height);if(!wallArt)wallArt=buildWallArt();ctx.drawImage(wallArt,0,0);const labelBoxes=ghostLabels();for(let k of dots){let [x,y]=k.split(',').map(Number);ctx.fillStyle='#9aafc9';ctx.fillRect(x*S+15,y*S+15,3,3)}for(let k of pellets){let [x,y]=k.split(',').map(Number);ctx.fillStyle='#ffe26e';ctx.beginPath();ctx.arc(x*S+16,y*S+16,6,0,7);ctx.fill()}for(let g of ghosts){let x=g.x*S+16,y=g.y*S+16;ctx.save();ctx.globalAlpha=collectionFreeze>0?.3:(freeze>0?.6:1);ctx.fillStyle=g.color;ctx.beginPath();ctx.arc(x,y-4,15,Math.PI,0);ctx.lineTo(x+15,y+12);for(let i=0;i<4;i++)ctx.lineTo(x+15-i*10,y+8+(i%2)*6);ctx.closePath();ctx.fill();ctx.fillStyle='#fff';ctx.fillRect(x-9,y-7,7,8);ctx.fillRect(x+4,y-7,7,8);ctx.fillStyle='#11223c';ctx.fillRect(x-6,y-4,3,4);ctx.fillRect(x+6,y-4,3,4);ctx.restore();ctx.save();ctx.globalAlpha=collectionFreeze>0?.3:1;ctx.font='bold 20px Courier New';const box=labelBoxes.get(g);if(!box){ctx.restore();continue}const {w,x:lx,y:ly}=box;ctx.strokeStyle=g.color;ctx.globalAlpha=.55;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(lx+w/2,ly+16);ctx.stroke();ctx.globalAlpha=collectionFreeze>0?.3:1;ctx.fillStyle='#101b30';ctx.fillRect(lx-3,ly-3,w+6,38);ctx.fillStyle='#263a55';ctx.fillRect(lx,ly,w,32);ctx.strokeStyle=g.color;ctx.lineWidth=2.5;ctx.strokeRect(lx+1,ly+1,w-2,30);ctx.fillStyle='#f5f8ff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(g.label,lx+w/2,ly+16,w-12);ctx.restore()}if(player){let x=player.x*S+16,y=player.y*S+16;ctx.save();if(invuln>0&&Math.floor(invuln*9)%2===0)ctx.globalAlpha=.3;let ang=player.dir.x===1?0:player.dir.x===-1?Math.PI:player.dir.y===-1?-Math.PI/2:Math.PI/2;ctx.fillStyle='#ffe24c';ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,15,ang+.38,ang+Math.PI*2-.38);ctx.closePath();ctx.fill();ctx.restore()}// Sentence chamber: drawn exactly over the solid island, never a walkable tile.
 {const cx=chamberX*S,cy=chamberY*S,cw=chamberW*S,ch=5*S;
 ctx.save();ctx.fillStyle='#0c1b31';ctx.fillRect(cx+2,cy+2,cw-4,ch-4);
 function roundedOutline(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();ctx.stroke()}
