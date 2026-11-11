@@ -67,7 +67,7 @@ function sayCompletedSentence(lastWord,fullSentence){
  }catch(e){completionFallback=setTimeout(()=>finishSentenceSpeech(token),3000)}
 }
 function notice(t,seconds=1.3){$('msg').textContent=t;messageTimer=seconds}
-function restart(){stopSwipeMovement();completionToken++;if(completionFallback!==null){clearTimeout(completionFallback);completionFallback=null}if('speechSynthesis' in window)speechSynthesis.cancel();sentence=0;word=0;score=0;lives=3;mazeNum=1;freeze=0;invuln=0;paused=false;over=false;transition=0;blocked=0;collectionFreeze=0;wordFlash='';wordFlashTimer=0;respawnGhost=null;mazeFade=0;flashAge=0;flashDuration=0;last=0;acc=0;ghostAcc=0;keys={};heldDirections=[];boostHeld=false;layout();spawn();$('overlay').classList.remove('on');$('pause').textContent='PAUSE';notice(portraitMaze?'USE THE ARROWS TO MOVE':'HOLD ARROWS / WASD TO MOVE',3)}
+function restart(){stopSwipeMovement();completionToken++;if(completionFallback!==null){clearTimeout(completionFallback);completionFallback=null}if('speechSynthesis' in window)speechSynthesis.cancel();sentence=0;word=0;score=0;lives=3;mazeNum=1;freeze=0;invuln=0;paused=false;over=false;transition=0;blocked=0;collectionFreeze=0;wordFlash='';wordFlashTimer=0;respawnGhost=null;mazeFade=0;flashAge=0;flashDuration=0;last=0;acc=0;ghostAcc=0;keys={};heldDirections=[];boostHeld=false;layout();spawn();$('overlay').classList.remove('on');$('pause').textContent='PAUSE';notice(matchMedia('(pointer:coarse)').matches?'SLIDE TO MOVE · TAP TO STOP':'HOLD ARROWS / WASD TO MOVE',3)}
 function end(){over=true;$('overlay').classList.add('on');$('overlayTitle').textContent='GAME OVER';$('overlayText').textContent='SCORE '+score+' · '+sentence+' SENTENCES COMPLETED'}
 function hurt(label){if(invuln>0||transition>0)return;lives--;invuln=2.3;notice('NOPE! '+label+' · −1 LIFE',1.5);if(lives<=0)end();renderHud()}
 function touch(){let k=key(player.x,player.y);if(dots.delete(k))score+=1;if(pellets.delete(k)){score+=5;freeze=5;notice('POWER PELLET · GHOSTS FROZEN!',1.5)}if(blocked>0||collectionFreeze>0)return;for(let g of ghosts){if(g.x!==player.x||g.y!==player.y)continue;if(g.correct){let collectedWord=words()[word];score+=20;word++;blocked=.2;collectionFreeze=1.05;invuln=Math.max(invuln,2.45);wordFlash=collectedWord;wordFlashTimer=.95;flashAge=0;flashDuration=.95;ghosts=ghosts.filter(other=>other!==g);respawnGhost=g;if(word>=words().length){let spoken=sentences[sentence%sentences.length][1];notice('✓ '+spoken,2.1);wordFlash=spoken;wordFlashTimer=9999;flashAge=0;flashDuration=9999;transition=9999;sayCompletedSentence(collectedWord,spoken);score+=50}else{say(collectedWord);notice('✓ '+collectedWord,.7)}renderHud();return}else{hurt(g.label);return}}}
@@ -175,28 +175,21 @@ let pfont=21;ctx.font='bold '+pfont+'px Courier New';while(ctx.measureText(promp
 ctx.fillStyle='#f1f7ff';ctx.fillText(prompt,cx+cw/2,promptY+2,cw-54);ctx.restore()}
 
 if(wordFlashTimer>0&&wordFlash){ctx.save();ctx.font='bold 44px Courier New';ctx.textAlign='center';ctx.textBaseline='middle';let w=Math.min(cv.width-40,Math.max(160,ctx.measureText(wordFlash).width+62));let x=cv.width/2,y=cv.height/2;let pop=1+0.12*Math.max(0,1-flashAge/.16);let alpha=transition>10?Math.min(1,flashAge/.08):Math.min(1,flashAge/.08,wordFlashTimer/.18);ctx.globalAlpha=Math.max(0,alpha);ctx.translate(x,y);ctx.scale(pop,pop);ctx.fillStyle='#162b46';ctx.fillRect(-w/2,-36,w,72);ctx.strokeStyle='#6ce4c9';ctx.lineWidth=3;ctx.strokeRect(-w/2,-36,w,72);ctx.fillStyle='#f6fbff';ctx.fillText(wordFlash,0,0,w-28);ctx.restore()}if(mazeFade>0){ctx.save();ctx.fillStyle='rgba(5,11,27,'+(mazeFade/.28*.75)+')';ctx.fillRect(0,0,cv.width,cv.height);ctx.restore()}if(paused){ctx.fillStyle='#071123c9';ctx.fillRect(0,0,cv.width,cv.height);ctx.font='bold 46px Courier New';ctx.fillStyle='#a8f0ff';ctx.textAlign='center';ctx.fillText('PAUSED',cv.width/2,cv.height/2)}}
-function frame(t){if(disposed)return;rafId=requestAnimationFrame(frame);if(!started)return;if(!last)last=t;let dt=Math.min(.05,(t-last)/1000);last=t;if(!paused&&!over){freeze=Math.max(0,freeze-dt);invuln=Math.max(0,invuln-dt);blocked=Math.max(0,blocked-dt);wordFlashTimer=Math.max(0,wordFlashTimer-dt);if(wordFlashTimer>0)flashAge+=dt;mazeFade=Math.max(0,mazeFade-dt);if(collectionFreeze>0){collectionFreeze=Math.max(0,collectionFreeze-dt);if(collectionFreeze===0&&transition<=0)restoreGhost()}if(respawnGhost&&collectionFreeze<=0&&transition<=0)restoreGhost();if(messageTimer>0){messageTimer-=dt;if(messageTimer<=0)notice(portraitMaze?'USE THE ARROWS TO MOVE':'HOLD ARROWS / WASD TO MOVE',100)}if(transition>0){transition-=dt;if(transition<=0)nextSentence()}else{acc+=dt;ghostAcc+=dt;const playerInterval=.105,ghostInterval=.58;while(acc>=playerInterval){acc-=playerInterval;stepPlayer();if(over||transition>0)break}if(!over&&transition<=0&&freeze<=0&&collectionFreeze<=0){while(ghostAcc>=ghostInterval){ghostAcc-=ghostInterval;for(let g of ghosts)stepGhost(g);touch();if(over||transition>0)break}}else if(freeze>0||collectionFreeze>0){ghostAcc=0}}}draw()}
+function frame(t){if(disposed)return;rafId=requestAnimationFrame(frame);if(!started)return;if(!last)last=t;let dt=Math.min(.05,(t-last)/1000);last=t;if(!paused&&!over){freeze=Math.max(0,freeze-dt);invuln=Math.max(0,invuln-dt);blocked=Math.max(0,blocked-dt);wordFlashTimer=Math.max(0,wordFlashTimer-dt);if(wordFlashTimer>0)flashAge+=dt;mazeFade=Math.max(0,mazeFade-dt);if(collectionFreeze>0){collectionFreeze=Math.max(0,collectionFreeze-dt);if(collectionFreeze===0&&transition<=0)restoreGhost()}if(respawnGhost&&collectionFreeze<=0&&transition<=0)restoreGhost();if(messageTimer>0){messageTimer-=dt;if(messageTimer<=0)notice(matchMedia('(pointer:coarse)').matches?'SLIDE TO MOVE · TAP TO STOP':'HOLD ARROWS / WASD TO MOVE',100)}if(transition>0){transition-=dt;if(transition<=0)nextSentence()}else{acc+=dt;ghostAcc+=dt;const playerInterval=.105,ghostInterval=.58;while(acc>=playerInterval){acc-=playerInterval;stepPlayer();if(over||transition>0)break}if(!over&&transition<=0&&freeze<=0&&collectionFreeze<=0){while(ghostAcc>=ghostInterval){ghostAcc-=ghostInterval;for(let g of ghosts)stepGhost(g);touch();if(over||transition>0)break}}else if(freeze>0||collectionFreeze>0){ghostAcc=0}}}draw()}
 const keyDirections={ArrowUp:dirs[3],ArrowDown:dirs[2],ArrowLeft:dirs[1],ArrowRight:dirs[0],KeyW:dirs[3],KeyS:dirs[2],KeyA:dirs[1],KeyD:dirs[0]};
 window.addEventListener('keydown',e=>{if(!started)return;if(keyDirections[e.code]){e.preventDefault();if(!keys[e.code])heldDirections.push(e.code);keys[e.code]=true;}if(e.code==='Space'){e.preventDefault();}if(e.code==='KeyP'&&!e.repeat){e.preventDefault();toggle();}});
 window.addEventListener('keyup',e=>{if(!started)return;if(keyDirections[e.code]){e.preventDefault();keys[e.code]=false;heldDirections=heldDirections.filter(k=>k!==e.code);}if(e.code==='Space'){e.preventDefault();}});
 window.addEventListener('blur',()=>{stopSwipeMovement();boostHeld=false;});
 function toggle(){if(over)return;stopSwipeMovement();paused=!paused;$('pause').textContent=paused?'RESUME':'PAUSE'}$('pause').onclick=toggle;$('restart').onclick=restart;$('again').onclick=restart;$('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'SOUND ON':'SOUND OFF';$('sound').setAttribute('aria-pressed',String(sound));if(!sound&&'speechSynthesis'in window){speechSynthesis.cancel();if(transition>10)finishSentenceSpeech(completionToken)}};rafId=requestAnimationFrame(frame);
-// Hold-to-move touch controls; the original keyboard movement engine is unchanged.
-const mobileDirections={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'};
-for(const button of document.querySelectorAll('#mobileDpad button')){
- const code=mobileDirections[button.dataset.dir];
- const release=()=>{delete keys[code];heldDirections=heldDirections.filter(k=>k!==code)};
- button.addEventListener('pointerdown',e=>{e.preventDefault();if(!started)return;stopSwipeMovement();button.setPointerCapture(e.pointerId);release();keys[code]=true;heldDirections.push(code)},{passive:false});
- for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,release);
-}
 let swipeStart=null;
 function stopSwipeMovement(){swipeStart=null;keys={};heldDirections=[];acc=0;}
-cv.addEventListener('pointerdown',e=>{
+for(const gestureSurface of [cv,$('movementGuide')]){
+gestureSurface.addEventListener('pointerdown',e=>{
  if(e.pointerType==='mouse'||swipeStart||!started||paused||over)return;
  swipeStart={id:e.pointerId,x:e.clientX,y:e.clientY};
- cv.setPointerCapture(e.pointerId);
+ e.currentTarget.setPointerCapture(e.pointerId);
 });
-cv.addEventListener('pointerup',e=>{
+gestureSurface.addEventListener('pointerup',e=>{
  if(swipeStart?.id!==e.pointerId)return;
  const dx=e.clientX-swipeStart.x,dy=e.clientY-swipeStart.y;
  stopSwipeMovement();
@@ -205,8 +198,9 @@ cv.addEventListener('pointerup',e=>{
  heldDirections=[code];keys[code]=true;stepPlayer();
 });
 function cancelSwipe(e){if(swipeStart?.id===e.pointerId)stopSwipeMovement();}
-cv.addEventListener('pointercancel',cancelSwipe);
-cv.addEventListener('lostpointercapture',cancelSwipe);
+gestureSurface.addEventListener('pointercancel',cancelSwipe);
+gestureSurface.addEventListener('lostpointercapture',cancelSwipe);
+}
 
 function stop(){stopSwipeMovement();completionToken++;clearTimeout(completionFallback);completionFallback=null;if('speechSynthesis'in window)speechSynthesis.cancel();paused=true;keys={};heldDirections=[];boostHeld=false;}
 $('play').onclick=()=>{started=true;$('preview').hidden=true;$('app').hidden=false;restart();$('pause').focus()};
