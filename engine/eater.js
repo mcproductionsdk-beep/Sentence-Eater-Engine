@@ -20,9 +20,9 @@ const base=[
 '#.###.#####.###.#.###.#####.###.#',
 '#...............#...............#',
 '#################################'];
-const LIB={};
+const LIB={};let shellSession=null;
 let sentences=[['I eat an apple.','Yo como una manzana'],['She drinks water.','Ella bebe agua'],['We live in Denmark.','Nosotros vivimos en Dinamarca'],['They study Spanish.','Ellos estudian español'],['He has a dog.','Él tiene un perro'],['I read a book.','Yo leo un libro'],['We go to school.','Nosotros vamos a la escuela'],['My sister sings well.','Mi hermana canta bien'],['I want some coffee.','Yo quiero un café'],['The cat sleeps here.','El gato duerme aquí']];
-const portraitMaze=matchMedia('(max-width:760px) and (orientation:portrait)').matches;const C=portraitMaze?15:33,R=portraitMaze?25:19,S=32,cv=document.querySelector('#game'),ctx=cv.getContext('2d');cv.width=C*S;cv.height=R*S;let maze=[],dots=new Set(),pellets=new Set(),player,ghosts=[],sentence=0,word=0,score=0,lives=3,mazeNum=1,freeze=0,invuln=0,paused=true,over=false,sound=true,last=0,acc=0,ghostAcc=0,messageTimer=0,transition=0,blocked=0,collectionFreeze=0,wordFlash='',wordFlashTimer=0,respawnGhost=null,mazeFade=0,flashAge=0,flashDuration=0;let started=false,rafId=0,disposed=false;let keys={};let heldDirections=[];let currentLanguage='es-ES';let boostHeld=false;let completionToken=0,completionFallback=null;const $=id=>document.getElementById(id),dirs=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}],pick=a=>a[Math.random()*a.length|0],words=()=>sentences[sentence%sentences.length][1].split(/\s+/),valid=(x,y)=>y>=0&&y<R&&x>=0&&x<C&&maze[y][x]!=='#',key=(x,y)=>x+','+y;
+const portraitMaze=matchMedia('(max-width:760px) and (orientation:portrait)').matches;const C=portraitMaze?15:33,R=portraitMaze?25:19,S=32,cv=document.querySelector('#game'),ctx=cv.getContext('2d');cv.width=C*S;cv.height=R*S;let maze=[],dots=new Set(),pellets=new Set(),player,ghosts=[],sentence=0,word=0,score=0,lives=3,mazeNum=1,freeze=0,invuln=0,paused=true,over=false,sound=true,last=0,acc=0,ghostAcc=0,messageTimer=0,transition=0,blocked=0,collectionFreeze=0,wordFlash='',wordFlashTimer=0,respawnGhost=null,mazeFade=0,flashAge=0,flashDuration=0;let started=false,rafId=0,disposed=false;let keys={};let heldDirections=[];let currentLanguage='es-ES';let boostHeld=false;let completionToken=0,completionFallback=null;const $=id=>document.getElementById(id),dirs=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}],pick=a=>a[Math.random()*a.length|0],words=()=>sentences[sentence%sentences.length][1].match(/[\p{L}\p{N}]+(?:[’'\-][\p{L}\p{N}]+)*/gu),valid=(x,y)=>y>=0&&y<R&&x>=0&&x<C&&maze[y][x]!=='#',key=(x,y)=>x+','+y;
 function layout(){let offset=(mazeNum-1)%4;maze=portraitMaze?Array.from({length:R},(_,y)=>Array.from({length:C},(_,x)=>x===0||x===C-1||y===0||y===R-1?'#':' ')):base.map(r=>r.split(''));if(portraitMaze){for(let y=4;y<R-3;y+=4)for(let x=3;x<C-2;x+=4)for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++)maze[y+dy][x+dx]='#';for(let y=1;y<R-1;y++)for(let x=1;x<C-1;x++)if(maze[y][x]===' '&&!(x===1&&y===1))maze[y][x]='.';for(const [x,y] of [[1,3],[13,3],[1,21],[13,21]])maze[y][x]='o';}if(offset&&!portraitMaze){for(let y=2;y<R-2;y++)for(let x=2;x<C-2;x++){if((x+y+offset*3)%17===0&&maze[y][x]==='#'&&validBase(x-1,y)&&validBase(x+1,y))maze[y][x]='.'}}// The central sentence chamber is solid and never contains dots, ghosts or the player.
 // Solid central island: collision geometry and drawn chamber share exactly these tiles.
 for(let y=chamberY;y<chamberY+5;y++)for(let x=chamberX;x<chamberX+chamberW;x++)maze[y][x]='#';
@@ -38,7 +38,7 @@ function freeTiles(){let a=[];for(let y=1;y<R-1;y++)for(let x=1;x<C-1;x++)if(val
 function spawn(){let tiles=freeTiles();player={x:1,y:1,dir:{x:1,y:0},want:{x:1,y:0}};if(!valid(player.x,player.y))player={...tiles[0],dir:dirs[0],want:dirs[0]};ghosts=[];for(let i=0;i<5;i++){let candidates=tiles.filter(p=>Math.abs(p.x-player.x)+Math.abs(p.y-player.y)>12&&!ghosts.some(g=>ghostDistance(p,g)<4));if(!candidates.length)candidates=tiles.filter(p=>ghostDistance(p,player)>6&&!ghosts.some(g=>g.x===p.x&&g.y===p.y));let t=pick(candidates);ghosts.push({...t,dir:pick(dirs),label:'',correct:false,chase:i%2===1,color:['#ff7e91','#6fe3ca','#c8a4ff','#ffb45d','#71b8ff'][i]})}labels()}
 function labels(){let target=words()[word],distractors=[...new Set([...(Object.values(LIB[currentLanguage]||{}).flat().flatMap(pair=>pair[1].split(/\s+/))),...sentences.flatMap(pair=>pair[1].split(/\s+/))])].filter(Boolean);let current=words();let pool=[...new Set([...current.filter((w,i)=>i!==word),...distractors])].filter(w=>w.toLocaleLowerCase()!==target.toLocaleLowerCase());ghosts.forEach((g,i)=>{g.correct=i===0;g.label=g.correct?target:pool.splice(Math.random()*pool.length|0,1)[0]||'otra'});ghosts.sort(()=>Math.random()-.5);renderHud()}
 function renderHud(){$('score').textContent='SCORE '+String(score).padStart(4,'0');$('lives').textContent='♥ '.repeat(lives).trim();$('prompt').textContent=sentences[sentence%sentences.length][0];$('progress').textContent='MAZE '+mazeNum+' · SENTENCE '+(sentence+1);$('slots').replaceChildren(...words().map((w,i)=>{let d=document.createElement('span');d.className='slot'+(i<word?' done':'');d.textContent=i<word?w:'?';return d}))}
-function say(t,after){if(!sound||!('speechSynthesis'in window))return;try{speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(t);u.lang=currentLanguage;u.rate=.9;if(after)u.onend=()=>{if(sound){let full=new SpeechSynthesisUtterance(after);full.lang=currentLanguage;full.rate=.9;speechSynthesis.speak(full)}};speechSynthesis.speak(u)}catch(e){}}
+function say(t,after){if(shellSession){void shellSession.speak(t);return;}if(!sound||!('speechSynthesis'in window))return;try{speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(t);u.lang=currentLanguage;u.rate=.9;if(after)u.onend=()=>{if(sound){let full=new SpeechSynthesisUtterance(after);full.lang=currentLanguage;full.rate=.9;speechSynthesis.speak(full)}};speechSynthesis.speak(u)}catch(e){}}
 function finishSentenceSpeech(token){
  if(token!==completionToken||transition<=0)return;
  if(completionFallback!==null){clearTimeout(completionFallback);completionFallback=null}
@@ -46,6 +46,8 @@ function finishSentenceSpeech(token){
  transition=.85;wordFlashTimer=Math.max(wordFlashTimer,.85);flashDuration=Math.max(flashDuration,.85);
 }
 function sayCompletedSentence(lastWord,fullSentence){
+ if(shellSession){const token=++completionToken;void(async()=>{await shellSession.speak(lastWord);if(token!==completionToken)return;await shellSession.speak(fullSentence);if(token===completionToken)finishSentenceSpeech(token)})();return;}
+
  const token=++completionToken;
  // The fallback handles muted sound, missing voices and browsers that never fire onend.
  if(completionFallback!==null)clearTimeout(completionFallback);
@@ -67,7 +69,7 @@ function sayCompletedSentence(lastWord,fullSentence){
  }catch(e){completionFallback=setTimeout(()=>finishSentenceSpeech(token),3000)}
 }
 function notice(t,seconds=1.3){$('msg').textContent=t;messageTimer=seconds}
-function restart(){stopSwipeMovement();completionToken++;if(completionFallback!==null){clearTimeout(completionFallback);completionFallback=null}if('speechSynthesis' in window)speechSynthesis.cancel();sentence=0;word=0;score=0;lives=3;mazeNum=1;freeze=0;invuln=0;paused=false;over=false;transition=0;blocked=0;collectionFreeze=0;wordFlash='';wordFlashTimer=0;respawnGhost=null;mazeFade=0;flashAge=0;flashDuration=0;last=0;acc=0;ghostAcc=0;keys={};heldDirections=[];boostHeld=false;layout();spawn();$('overlay').classList.remove('on');$('pause').textContent='PAUSE';notice(matchMedia('(pointer:coarse)').matches?'SLIDE TO MOVE · TAP TO STOP':'HOLD ARROWS / WASD TO MOVE',3)}
+function restart(){shellSession?.cancel();stopSwipeMovement();completionToken++;if(completionFallback!==null){clearTimeout(completionFallback);completionFallback=null}if('speechSynthesis' in window)speechSynthesis.cancel();sentence=0;word=0;score=0;lives=3;mazeNum=1;freeze=0;invuln=0;paused=false;over=false;transition=0;blocked=0;collectionFreeze=0;wordFlash='';wordFlashTimer=0;respawnGhost=null;mazeFade=0;flashAge=0;flashDuration=0;last=0;acc=0;ghostAcc=0;keys={};heldDirections=[];boostHeld=false;layout();spawn();$('overlay').classList.remove('on');$('pause').textContent='PAUSE';notice(matchMedia('(pointer:coarse)').matches?'SLIDE TO MOVE · TAP TO STOP':'HOLD ARROWS / WASD TO MOVE',3)}
 function end(){over=true;$('overlay').classList.add('on');$('overlayTitle').textContent='GAME OVER';$('overlayText').textContent='SCORE '+score+' · '+sentence+' SENTENCES COMPLETED'}
 function hurt(label){if(invuln>0||transition>0)return;lives--;invuln=2.3;notice('NOPE! '+label+' · −1 LIFE',1.5);if(lives<=0)end();renderHud()}
 function touch(){let k=key(player.x,player.y);if(dots.delete(k))score+=1;if(pellets.delete(k)){score+=5;freeze=5;notice('POWER PELLET · GHOSTS FROZEN!',1.5)}if(blocked>0||collectionFreeze>0)return;for(let g of ghosts){if(g.x!==player.x||g.y!==player.y)continue;if(g.correct){let collectedWord=words()[word];score+=20;word++;blocked=.2;collectionFreeze=1.05;invuln=Math.max(invuln,2.45);wordFlash=collectedWord;wordFlashTimer=.95;flashAge=0;flashDuration=.95;ghosts=ghosts.filter(other=>other!==g);respawnGhost=g;if(word>=words().length){let spoken=sentences[sentence%sentences.length][1];notice('✓ '+spoken,2.1);wordFlash=spoken;wordFlashTimer=9999;flashAge=0;flashDuration=9999;transition=9999;sayCompletedSentence(collectedWord,spoken);score+=50}else{say(collectedWord);notice('✓ '+collectedWord,.7)}renderHud();return}else{hurt(g.label);return}}}
@@ -180,7 +182,7 @@ const keyDirections={ArrowUp:dirs[3],ArrowDown:dirs[2],ArrowLeft:dirs[1],ArrowRi
 window.addEventListener('keydown',e=>{if(!started)return;if(keyDirections[e.code]){e.preventDefault();if(!keys[e.code])heldDirections.push(e.code);keys[e.code]=true;}if(e.code==='Space'){e.preventDefault();}if(e.code==='KeyP'&&!e.repeat){e.preventDefault();toggle();}});
 window.addEventListener('keyup',e=>{if(!started)return;if(keyDirections[e.code]){e.preventDefault();keys[e.code]=false;heldDirections=heldDirections.filter(k=>k!==e.code);}if(e.code==='Space'){e.preventDefault();}});
 window.addEventListener('blur',()=>{stopSwipeMovement();boostHeld=false;});
-function toggle(){if(over)return;stopSwipeMovement();paused=!paused;$('pause').textContent=paused?'RESUME':'PAUSE'}$('pause').onclick=toggle;$('restart').onclick=restart;$('again').onclick=restart;$('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'SOUND ON':'SOUND OFF';$('sound').setAttribute('aria-pressed',String(sound));if(!sound&&'speechSynthesis'in window){speechSynthesis.cancel();if(transition>10)finishSentenceSpeech(completionToken)}};rafId=requestAnimationFrame(frame);
+function toggle(){if(over)return;stopSwipeMovement();paused=!paused;$('pause').textContent=paused?'RESUME':'PAUSE'}$('pause').onclick=toggle;$('restart').onclick=restart;$('again').onclick=restart;$('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'SOUND ON':'SOUND OFF';$('sound').setAttribute('aria-pressed',String(sound));shellSession?.sound(sound);if(!sound&&'speechSynthesis'in window){speechSynthesis.cancel();if(transition>10)finishSentenceSpeech(completionToken)}};rafId=requestAnimationFrame(frame);
 let swipeStart=null;
 function stopSwipeMovement(){swipeStart=null;keys={};heldDirections=[];acc=0;}
 for(const gestureSurface of [cv,$('movementGuide')]){
@@ -202,9 +204,36 @@ gestureSurface.addEventListener('pointercancel',cancelSwipe);
 gestureSurface.addEventListener('lostpointercapture',cancelSwipe);
 }
 
-function stop(){stopSwipeMovement();completionToken++;clearTimeout(completionFallback);completionFallback=null;if('speechSynthesis'in window)speechSynthesis.cancel();paused=true;keys={};heldDirections=[];boostHeld=false;}
+function stop(){shellSession?.cancel();stopSwipeMovement();completionToken++;clearTimeout(completionFallback);completionFallback=null;if('speechSynthesis'in window)speechSynthesis.cancel();paused=true;keys={};heldDirections=[];boostHeld=false;}
 $('play').onclick=()=>{started=true;$('preview').hidden=true;$('app').hidden=false;restart();$('pause').focus()};
-$('menuReturn').onclick=()=>{stop();started=false;$('app').hidden=true;$('preview').hidden=false;$('play').focus()};
+$('menuReturn').onclick=()=>{if(shellSession){stop();shellSession.menu();return;}stop();started=false;$('app').hidden=true;$('preview').hidden=false;$('play').focus()};
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&started&&!paused){toggle();keys={};heldDirections=[]}});
 window.addEventListener('pagehide',()=>{stop();disposed=true;cancelAnimationFrame(rafId)},{once:true});
+
+if(window.parent!==window){
+ $('play').hidden=true;$('preview').querySelector('p').textContent='Open Sentence Eater through the staging launcher.';
+ let origin;try{origin=new URL(document.referrer).origin}catch{}
+ if(/^https:\/\/(?:[a-z0-9-]+\.)?bt-vocabulary-platform-staging\.pages\.dev$/.test(origin)){
+  const protocol='bt-sentence-eater/1';let sessionId,sequence=0,pending;
+  const send=(type,data={})=>window.parent.postMessage({protocol,sessionId,type,...data},origin);
+  function settle(){if(pending){clearTimeout(pending.timer);pending.resolve();pending=null}}
+  function receive(event){
+   const d=event.data;if(event.source!==window.parent||event.origin!==origin||d?.protocol!==protocol)return;
+   if(!sessionId&&d.type==='INIT'&&/^[\w-]{24,64}$/.test(d.sessionId)){
+    const {pairs,language}=d.set??{};
+    if(!['es-ES','de-DE','da-DK','fr-FR','it-IT'].includes(language)||typeof d.soundOn!=='boolean'||!Array.isArray(pairs)||pairs.length<2||pairs.length>100||pairs.some(p=>!Array.isArray(p)||p.length!==2||p.some(t=>typeof t!=='string'||!t.trim()||t.length>1000)||!/[\p{L}\p{N}]/u.test(p[1])))return;
+    sessionId=d.sessionId;sentences=pairs.map(p=>[...p]);currentLanguage=language;
+    shellSession={
+     speak(text){settle();if(!sound)return Promise.resolve();return new Promise(resolve=>{const id=++sequence;pending={id,resolve,timer:setTimeout(settle,Math.min(20000,Math.max(5000,text.length*160)))};send('SPEAK',{id,text})})},
+     cancel(){settle();send('CANCEL')},sound(soundOn){if(!soundOn)settle();send('SOUND',{soundOn})},menu(){settle();send('MENU')}
+    };
+    sound=d.soundOn;$('sound').textContent=sound?'SOUND ON':'SOUND OFF';$('sound').setAttribute('aria-pressed',String(sound));
+    started=true;$('preview').hidden=true;$('app').hidden=false;restart();$('pause').focus();send('STARTED');
+   }else if(sessionId&&d.sessionId===sessionId&&d.type==='SPOKEN'&&d.id===pending?.id)settle();
+  }
+  window.addEventListener('message',receive);
+  window.addEventListener('pagehide',()=>{settle();window.removeEventListener('message',receive)},{once:true});
+  void import('./build-id.mjs').then(({default:buildId})=>send('READY',{buildId}));
+ }
+}
 })();
