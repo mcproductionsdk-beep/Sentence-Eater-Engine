@@ -21,6 +21,22 @@ try{
  await page.getByRole('button',{name:'PAUSE',exact:true}).click();const before=await page.evaluate(()=>fixture.state());assert.equal(before.paused,true);
  await page.keyboard.down('ArrowRight');await page.waitForTimeout(250);await page.keyboard.up('ArrowRight');assert.equal((await page.evaluate(()=>fixture.state())).x,before.x);
  await page.getByRole('button',{name:'RESUME',exact:true}).click();await page.keyboard.down('ArrowRight');await page.waitForTimeout(250);await page.keyboard.up('ArrowRight');assert.ok((await page.evaluate(()=>fixture.state())).x>before.x);
+ if(label!=='desktop'){
+ await page.getByRole('button',{name:'RESTART',exact:true}).click();
+ const gesture=async(dx,dy,type='pointerup')=>page.locator('#game').evaluate((canvas,[dx,dy,type])=>{
+  canvas.dispatchEvent(new PointerEvent('pointerdown',{pointerId:71,pointerType:'touch',clientX:100,clientY:100,bubbles:true}));
+  canvas.dispatchEvent(new PointerEvent(type,{pointerId:71,pointerType:'touch',clientX:100+dx,clientY:100+dy,bubbles:true}));
+ },[dx,dy,type]);
+ // Synthetic fixture pointers do not own native pointer capture.
+ await page.evaluate(()=>{document.querySelector('#game').setPointerCapture=()=>{}});
+ await gesture(55,0);await page.waitForTimeout(240);
+ assert.ok((await page.evaluate(()=>fixture.state())).x>1);
+ await gesture(0,0);const stopped=await page.evaluate(()=>fixture.state());
+ await page.waitForTimeout(300);assert.equal((await page.evaluate(()=>fixture.state())).x,stopped.x);
+ await gesture(55,0);await page.getByRole('button',{name:'PAUSE',exact:true}).click();await page.getByRole('button',{name:'RESUME',exact:true}).click();
+ const resumed=await page.evaluate(()=>fixture.state());await page.waitForTimeout(240);assert.equal((await page.evaluate(()=>fixture.state())).x,resumed.x);
+ await gesture(55,0);await gesture(0,0,'pointercancel');const cancelled=await page.evaluate(()=>fixture.state());await page.waitForTimeout(240);assert.equal((await page.evaluate(()=>fixture.state())).x,cancelled.x);
+ }
  await page.getByRole('button',{name:'RESTART',exact:true}).click();await page.evaluate(()=>fixture.collect(false));assert.equal((await page.evaluate(()=>fixture.state())).lives,2);
  await page.getByRole('button',{name:'RESTART',exact:true}).click();assert.deepEqual(await page.evaluate(()=>fixture.spacing()),{distinct:true,readable:true});await page.getByRole('button',{name:'RESTART',exact:true}).click();assert.equal(await page.evaluate(()=>fixture.passages()),true);const safe=await page.evaluate(()=>fixture.safeRespawn());assert.ok(safe.distance>=7);assert.equal(safe.protected,true);assert.equal(safe.ghostCount,5);
  await page.getByRole('button',{name:'RESTART',exact:true}).click();await page.evaluate(()=>fixture.pellet());assert.ok((await page.evaluate(()=>fixture.state())).freeze>4);
