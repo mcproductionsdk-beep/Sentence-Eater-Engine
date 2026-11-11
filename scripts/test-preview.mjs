@@ -47,4 +47,31 @@ try{
  await page.getByRole('button',{name:'SOUND ON',exact:true}).click();assert.equal(await page.locator('#sound').getAttribute('aria-pressed'),'false');
  await page.getByRole('button',{name:'MAIN MENU',exact:true}).click();assert.equal(await page.getByRole('button',{name:'Play sample',exact:true}).isVisible(),true);assert.deepEqual(errors,[]);assert.deepEqual(external,[]);await context.close();console.log(label+' passed');
  }
+
+ // Exercise the real iframe adapter with denied network and controlled shared speech.
+ for(const [language,target] of [['es-ES','gato rojo'],['de-DE','rote Katze'],['da-DK','rød kat'],['fr-FR','chat rouge'],['it-IT','gatto rosso']]){
+  const context=await browser.newContext();const page=await context.newPage();
+  const shell='https://bt-vocabulary-platform-staging.pages.dev',engine='https://abcd1234.bt-sentence-eater-preview.pages.dev';
+  await context.route('**/*',async route=>{
+   const u=new URL(route.request().url());
+   if(u.origin===shell)return route.fulfill({contentType:'text/html',body:'<iframe src="'+engine+'/"></iframe><script>window.events=[];addEventListener("message",e=>{events.push(e.data);if(e.data.type==="SPEAK")e.source.postMessage({...e.data,type:"SPOKEN"},e.origin)})</script>'});
+   const path=u.pathname==='/'?'index.html':u.pathname.slice(1);
+   if(u.origin!==engine||!['index.html','engine/eater.js','engine/eater.css','engine/build-id.mjs'].includes(path))return route.abort();
+   let body=await readFile(new URL(path,root),'utf8');if(path==='engine/eater.js')body=body.replace(/\}\)\(\);\s*$/,hook+'})();');
+   return route.fulfill({headers:{'Content-Type':path.endsWith('.html')?'text/html':path.endsWith('.css')?'text/css':'text/javascript','Content-Security-Policy':csp},body});
+  });
+  await page.goto(shell);await page.waitForFunction(()=>events.some(e=>e.type==='READY'));
+  const manifest=JSON.parse(await readFile(new URL('version.json',root),'utf8'));
+  assert.equal(await page.evaluate(()=>events.find(e=>e.type==='READY').buildId),manifest.buildId);
+  await page.evaluate(([language,target,engine])=>document.querySelector('iframe').contentWindow.postMessage({protocol:'bt-sentence-eater/1',type:'INIT',sessionId:'integration-session-1234567890',soundOn:true,set:{title:'Fixture',language,pairs:[['The red cat.',target],['Another prompt.',target]]}},engine),[language,target,engine]);
+  await page.waitForFunction(()=>events.some(e=>e.type==='STARTED'));
+  const frame=page.frames().find(f=>f.url().startsWith(engine));
+  assert.equal(await frame.locator('#prompt').textContent(),'The red cat.');
+  await frame.evaluate(()=>fixture.collect(true));await frame.evaluate(()=>{fixture.resumeGhost();fixture.collect(true)});
+  await page.waitForFunction(()=>events.filter(e=>e.type==='SPEAK').length===3);
+  const spoken=await page.evaluate(()=>events.filter(e=>e.type==='SPEAK').map(e=>e.text));
+  assert.deepEqual(spoken,[...target.split(' '),target]);
+  await frame.getByRole('button',{name:'MAIN MENU',exact:true}).click();await page.waitForFunction(()=>events.some(e=>e.type==='MENU'));
+  await context.close();console.log(language+' shared adapter passed');
+ }
 }finally{await browser.close();server.close()}
