@@ -56,7 +56,7 @@ try{
    const u=new URL(route.request().url());
    if(u.origin===shell)return route.fulfill({contentType:'text/html',body:'<iframe src="'+engine+'/"></iframe><script>window.events=[];addEventListener("message",e=>{events.push(e.data);if(e.data.type==="SPEAK")e.source.postMessage({...e.data,type:"SPOKEN"},e.origin)})</script>'});
    const path=u.pathname==='/'?'index.html':u.pathname.slice(1);
-   if(u.origin!==engine||!['index.html','engine/eater.js','engine/eater.css','engine/build-id.mjs'].includes(path))return route.abort();
+   if(u.origin!==engine||!['index.html','engine/eater.js','engine/eater.css','engine/lifecycle.js','engine/build-id.mjs'].includes(path))return route.abort();
    let body=await readFile(new URL(path,root),'utf8');if(path==='engine/eater.js')body=body.replace(/\}\)\(\);\s*$/,hook+'})();');
    return route.fulfill({headers:{'Content-Type':path.endsWith('.html')?'text/html':path.endsWith('.css')?'text/css':'text/javascript','Content-Security-Policy':csp},body});
   });
